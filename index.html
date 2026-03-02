@@ -186,6 +186,20 @@ h3{font-family:var(--font-display);font-weight:700;font-size:14px}
 
 .card-hint{font-size:12px;color:var(--darkgray);text-align:center;margin-top:8px;min-height:20px;font-weight:500}
 
+/* ─── KEYPAD ─── */
+.keypad-zone{width:100%;max-width:340px;margin:0 auto;display:none;flex-direction:column;align-items:center;gap:8px}
+.keypad-zone.visible{display:flex}
+.keypad-display{font-family:var(--font-display);font-weight:900;font-size:36px;min-height:48px;text-align:center;width:100%;border:3px solid var(--black);background:var(--white);padding:4px 12px;letter-spacing:4px}
+.keypad-display.empty{color:var(--darkgray);font-size:16px;font-weight:500;letter-spacing:0}
+.keypad-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;width:100%}
+.kbtn{font-family:var(--font-display);font-weight:700;font-size:20px;padding:14px 0;border:3px solid var(--black);background:var(--white);cursor:pointer;box-shadow:3px 3px 0 var(--black);transition:transform .06s,box-shadow .06s;text-align:center}
+.kbtn:active{transform:translate(2px,2px);box-shadow:0 0 0 var(--black)}
+.kbtn-go{background:var(--green);color:var(--white);font-size:16px}
+.kbtn-del{font-size:14px}
+.letter-grid{display:flex;flex-wrap:wrap;gap:5px;justify-content:center;width:100%}
+.lkbtn{font-family:var(--font-display);font-weight:700;font-size:16px;width:38px;height:42px;border:3px solid var(--black);background:var(--white);cursor:pointer;box-shadow:2px 2px 0 var(--black);transition:transform .06s,box-shadow .06s;display:flex;align-items:center;justify-content:center}
+.lkbtn:active{transform:translate(2px,2px);box-shadow:0 0 0 var(--black)}
+
 /* Judgment */
 .judgment-zone{width:100%;max-width:700px;margin:0 auto;padding:8px 0;display:flex;flex-direction:column;align-items:center;gap:8px}
 .judgment-q{font-family:var(--font-display);font-weight:700;font-size:13px;min-height:22px;color:var(--darkgray)}
@@ -511,6 +525,24 @@ h3{font-family:var(--font-display);font-weight:700;font-size:14px}
     </div>
     <div class="card-hint" id="card-hint">Tap the card to flip</div>
     <div class="card-timer" id="card-timer">:20</div>
+    <div class="keypad-zone" id="keypad-zone">
+      <div class="keypad-display empty" id="keypad-display">Type your answer</div>
+      <div class="keypad-grid" id="keypad-num">
+        <button class="kbtn" onclick="App.kType('1')">1</button>
+        <button class="kbtn" onclick="App.kType('2')">2</button>
+        <button class="kbtn" onclick="App.kType('3')">3</button>
+        <button class="kbtn kbtn-del" onclick="App.kDel()">DEL</button>
+        <button class="kbtn" onclick="App.kType('4')">4</button>
+        <button class="kbtn" onclick="App.kType('5')">5</button>
+        <button class="kbtn" onclick="App.kType('6')">6</button>
+        <button class="kbtn" onclick="App.kType('7')">7</button>
+        <button class="kbtn" onclick="App.kType('8')">8</button>
+        <button class="kbtn" onclick="App.kType('9')">9</button>
+        <button class="kbtn kbtn-zero" onclick="App.kType('0')">0</button>
+        <button class="kbtn kbtn-go" onclick="App.kSubmit()">GO</button>
+      </div>
+      <div class="letter-grid" id="keypad-letter" style="display:none"></div>
+    </div>
   </div>
   <div class="judgment-zone">
     <div class="judgment-q" id="judgment-q">&nbsp;</div>
@@ -909,6 +941,42 @@ const App={
     }
   },
 
+  // ─── KEYPAD ───
+  kVal:'',
+  kType(c){if(this.flipped||this.processing)return;if(this.kVal.length>=4)return;this.kVal+=c;const d=document.getElementById('keypad-display');d.textContent=this.kVal;d.classList.remove('empty')},
+  kDel(){if(this.flipped||this.processing)return;this.kVal=this.kVal.slice(0,-1);const d=document.getElementById('keypad-display');if(this.kVal){d.textContent=this.kVal;d.classList.remove('empty')}else{d.textContent='Type your answer';d.classList.add('empty')}},
+  kSubmit(){
+    if(this.flipped||this.processing||!this.kVal)return;
+    const f=this.session.all[this.idx];
+    const expected=f.op==='letter'?SM2.LETTERS[f.a]:SM2.ans(f.op,f.a,f.b);
+    const userAns=f.op==='letter'?this.kVal:parseInt(this.kVal,10);
+    const ok=userAns===expected;
+    this.flipCard(true);
+    setTimeout(()=>this.judge(ok),600);
+  },
+  kLetterPick(letter){
+    if(this.flipped||this.processing)return;
+    const f=this.session.all[this.idx];
+    const expected=SM2.LETTERS[f.a];
+    const ok=letter===expected;
+    this.flipCard(true);
+    setTimeout(()=>this.judge(ok),600);
+  },
+  kReset(){this.kVal='';const d=document.getElementById('keypad-display');if(d){d.textContent='Type your answer';d.classList.add('empty')}},
+  kShowKeypad(f){
+    const zone=document.getElementById('keypad-zone');
+    const numPad=document.getElementById('keypad-num');
+    const letterPad=document.getElementById('keypad-letter');
+    if(this.speechMode){zone.classList.remove('visible');return}
+    zone.classList.add('visible');this.kReset();
+    if(f.op==='letter'){
+      numPad.style.display='none';letterPad.style.display='flex';
+      letterPad.innerHTML=SM2.LETTERS.map(l=>`<button class="lkbtn" onclick="App.kLetterPick('${l}')">${l}</button>`).join('');
+    }else{
+      numPad.style.display='grid';letterPad.style.display='none';
+    }
+  },
+
   checkStreak(){const today=new Date().toDateString(),s=this.state.streak;if(s.lastDate===today)return;if(s.lastDate){const diff=Math.floor((Date.now()-new Date(s.lastDate).getTime())/864e5);if(diff>2)s.count=0}},
   recordStreak(){const today=new Date().toDateString();if(this.state.streak.lastDate!==today){this.state.streak.count++;this.state.streak.lastDate=today}},
 
@@ -1073,8 +1141,10 @@ const App={
     document.getElementById('jbtn-no').classList.add('disabled');
     document.getElementById('judgment-q').innerHTML='&nbsp;';
     const isLetterMode=f.op==='letter';
-    document.getElementById('card-hint').textContent=this.speechMode?(isLetterMode?'Say the letter out loud':'Say the answer out loud'):(isLetterMode?'What letter is this? Tap to flip':'Tap the card to flip');
-    document.getElementById('fc-prompt').textContent=this.speechMode?(isLetterMode?'SAY THE LETTER':'SAY THE ANSWER'):(isLetterMode?'WHAT LETTER?':'SAY IT, THEN TAP');
+    const hasKeypad=!this.speechMode;
+    document.getElementById('card-hint').textContent=this.speechMode?(isLetterMode?'Say the letter out loud':'Say the answer out loud'):hasKeypad?(isLetterMode?'Pick the matching letter':'Type your answer & tap GO'):(isLetterMode?'What letter is this? Tap to flip':'Tap the card to flip');
+    document.getElementById('fc-prompt').textContent=this.speechMode?(isLetterMode?'SAY THE LETTER':'SAY THE ANSWER'):hasKeypad?(isLetterMode?'WHICH LETTER?':'WHAT\'S THE ANSWER?'):(isLetterMode?'WHAT LETTER?':'SAY IT, THEN TAP');
+    this.kShowKeypad(f);
     // Phase tag
     const wl=this.session.warmup.length,cl=this.session.core.length;
     const tag=document.getElementById('phase-tag');
@@ -1107,13 +1177,18 @@ const App={
     }else{ss.style.display='none'}
   },
 
-  flipCard(){
+  flipCard(fromKeypad){
     if(this.processing||this.flipped)return;
+    const hasKeypad=!this.speechMode;
+    if(hasKeypad&&!fromKeypad)return; // block manual flip when keypad is active
     SFX.sfxFlip();Speech.pause();
     document.getElementById('flashcard').classList.add('flipped');this.flipped=true;
-    document.getElementById('jbtn-yes').classList.remove('disabled');
-    document.getElementById('jbtn-no').classList.remove('disabled');
-    document.getElementById('judgment-q').textContent='Did you get it right?';
+    document.getElementById('keypad-zone').classList.remove('visible');
+    if(!fromKeypad){
+      document.getElementById('jbtn-yes').classList.remove('disabled');
+      document.getElementById('jbtn-no').classList.remove('disabled');
+      document.getElementById('judgment-q').textContent='Did you get it right?';
+    }
     document.getElementById('card-hint').textContent='';
   },
 
